@@ -10,6 +10,10 @@
        content, so a stale or hand-edited copy is easy to spot.
     2. Adds one marked block to <project>/CLAUDE.md that imports .claude/gwin-shared/RULES.md
        (creating CLAUDE.md if there is none). Nothing else in CLAUDE.md is touched.
+    3. Copies hooks/session-rename-reminder.sh into <project>/.claude/gwin-shared/hooks/ and adds one
+       PostToolUse hook entry for it to <project>/.claude/settings.json (needs python). After `gh pr create`
+       or `gh pr merge` the hook reminds Claude to rename the session. Other settings and hooks in the file
+       are not touched.
 
   If the folder is not a git repo, or the repo has no GitHub remote, it warns that the rules will work
   only on this computer: Claude cloud sessions read the project from GitHub.
@@ -175,6 +179,15 @@ if ($Check) {
     if ((Test-Path -LiteralPath $cm) -and ((Read-Text $cm).Contains($StartMark)) -and ((Read-Text $cm).Contains("@$DestRel/RULES.md"))) { Add-Result 'PASS' 'rules: CLAUDE.md imports RULES.md' '' }
     else { Add-Result 'FIX' 'rules: CLAUDE.md imports RULES.md' 'Run gwinrules -Apply.' }
     Add-Result 'INFO' 'rules: loaded in a session' 'Start a new session and run /memory. All 12 rule files must show.'
+
+    # Session-rename hook
+    $hk = Join-Path $cd 'hooks/session-rename-reminder.sh'
+    $hkSrc = Join-Path $Repo 'hooks/session-rename-reminder.sh'
+    if ((Test-Path -LiteralPath $hk) -and (Test-Path -LiteralPath $hkSrc) -and ((Get-ShortHash (Normalize (Read-Text $hk))) -eq (Get-ShortHash (Normalize (Read-Text $hkSrc))))) { Add-Result 'PASS' 'hook: session-rename script is installed and matches Gwin_Shared' '' }
+    else { Add-Result 'FIX' 'hook: session-rename script is installed and matches Gwin_Shared' 'Run gwinrules -Apply.' }
+    $hs = Join-Path $ProjectRoot '.claude/settings.json'
+    if ((Test-Path -LiteralPath $hs) -and (Read-Text $hs).Contains('gwin-shared/hooks/session-rename-reminder')) { Add-Result 'PASS' 'hook: settings.json runs the session-rename hook' '' }
+    else { Add-Result 'FIX' 'hook: settings.json runs the session-rename hook' 'Run gwinrules -Apply. If you merged settings.json by hand, keep the gwin-shared hook entry.' }
 
     # Staging and protection (rules 02, 07)
     if ($IsGit) {
@@ -387,6 +400,71 @@ if ($null -ne $newText) {
     }
 }
 
+# --- Session-rename hook -----------------------------------------------------------------------
+# Copies hooks/session-rename-reminder.sh into .claude/gwin-shared/hooks/ and wires it into
+# .claude/settings.json as a PostToolUse hook on Bash. After `gh pr create` or `gh pr merge` it reminds
+# Claude to rename the session. Only our own handler in settings.json is touched; python is needed to edit it.
+
+Write-Host 'Session-rename hook'
+$HookSrc   = Join-Path $Repo 'hooks/session-rename-reminder.sh'
+$HookHelper = Join-Path $PSScriptRoot 'gwinrules-hook-settings.py'
+$HookRel   = "$DestRel/hooks/session-rename-reminder.sh"
+$HookDst   = Join-Path $ProjectRoot $HookRel
+$Settings  = Join-Path $ProjectRoot '.claude/settings.json'
+# The command strips CR first: a Windows clone with autocrlf=true checks the script out with CRLF, which breaks sh.
+$HookCmd   = 'sh -c "$(tr -d ''\r'' < "$CLAUDE_PROJECT_DIR/' + $HookRel + '")"'
+$Py = $null
+foreach ($p in @('python3', 'python')) {
+    if (Get-Command $p -ErrorAction SilentlyContinue) {
+        & $p -c 'import json' 2>$null | Out-Null
+        if ($LASTEXITCODE -eq 0) { $Py = $p; break }
+    }
+}
+function Test-ManagedHook([string]$Path) {
+    $lines = (Normalize (Read-Text $Path)).Split("`n")
+    $lines.Count -ge 2 -and $lines[1].Contains('Managed by gwinrules')
+}
+
+if (-not (Test-Path -LiteralPath $HookSrc) -or -not (Test-Path -LiteralPath $HookHelper)) {
+    Write-Warning 'hook files are missing from Gwin_Shared (hooks/session-rename-reminder.sh); hook skipped'
+} elseif (-not $Py) {
+    Write-Warning 'python was not found, so .claude/settings.json cannot be edited; session-rename hook skipped. Install Python 3 and re-run.'
+} else {
+    $hookOk = $true
+    $hookText = Normalize (Read-Text $HookSrc)
+    if ($Uninstall) {
+        if (Test-Path -LiteralPath $HookDst) {
+            if ((Test-ManagedHook $HookDst) -or $Force) { Add-Action 'remove' $HookDst '' $null }
+            else { Write-Warning "keep ${HookRel}: not created by gwinrules (use -Force to remove)" }
+        }
+    } elseif (-not (Test-Path -LiteralPath $HookDst)) { Add-Action 'add' $HookDst '' $hookText }
+    elseif (-not (Test-ManagedHook $HookDst) -and -not $Force) {
+        Write-Warning "skip ${HookRel}: exists but wasn't created by gwinrules (use -Force to replace)"; $hookOk = $false
+    }
+    elseif ((Normalize (Read-Text $HookDst)) -ceq $hookText) { Write-Host ('  {0,-8} {1}' -f 'same', $HookRel) }
+    else { Add-Action 'update' $HookDst '' $hookText }
+
+    if ($hookOk) {
+        $setNew = [System.IO.Path]::GetTempFileName()
+        try {
+            $mode = if ($Uninstall) { 'uninstall' } else { 'install' }
+            $res = (& $Py $HookHelper $Settings $mode $HookCmd $setNew 2>$null)
+            $rc = $LASTEXITCODE
+            if ($rc -ne 0) {
+                Write-Warning '.claude/settings.json is not valid JSON or has an unexpected shape; fix it by hand. It was left unchanged and the hook is not wired.'
+            } else {
+                switch ("$res".Trim()) {
+                    'create' { Add-Action 'create' $Settings 'hook entry' (Read-Text $setNew) }
+                    'update' { Add-Action 'update' $Settings $(if ($Uninstall) { 'remove the hook entry' } else { 'add or refresh the hook entry' }) (Read-Text $setNew) }
+                    'remove' { Add-Action 'remove' $Settings 'only held the hook entry' $null }
+                    'same'   { Write-Host ('  {0,-8} {1}' -f 'same', '.claude/settings.json') }
+                    default  { if (-not $Uninstall) { Write-Host ('  {0,-8} {1}' -f 'none', '.claude/settings.json') } }
+                }
+            }
+        } finally { Remove-Item -LiteralPath $setNew -Force -ErrorAction SilentlyContinue }
+    }
+}
+
 # --- Apply -------------------------------------------------------------------------------------
 
 Write-Host ''
@@ -397,10 +475,16 @@ if (-not $Apply) { Write-Host "Preview only: $($actions.Count) change(s). Re-run
 if (-not $Uninstall -and -not (Test-Path -LiteralPath $Dest)) { New-Item -ItemType Directory -Path $Dest -Force | Out-Null }
 foreach ($a in $actions) {
     if ($a.Kind -eq 'remove') { Remove-Item -LiteralPath $a.Path -Force }
-    else { Write-Text $a.Path $a.Text }
+    else {
+        $dir = Split-Path -Parent $a.Path
+        if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+        Write-Text $a.Path $a.Text
+    }
 }
-if ($Uninstall -and (Test-Path -LiteralPath $Dest) -and -not (Get-ChildItem -LiteralPath $Dest -Force)) {
-    Remove-Item -LiteralPath $Dest -Force
+if ($Uninstall) {
+    foreach ($d in @((Join-Path $Dest 'hooks'), $Dest)) {
+        if ((Test-Path -LiteralPath $d) -and -not (Get-ChildItem -LiteralPath $d -Force)) { Remove-Item -LiteralPath $d -Force }
+    }
 }
 Write-Host "Wrote $($actions.Count) change(s). Nothing was committed."
 if ($IsGit) {

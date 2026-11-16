@@ -7,6 +7,9 @@
 #      each stamped with its source file, the Gwin_Shared commit and a content hash.
 #   2. Adds one marked block to <project>/CLAUDE.md importing .claude/gwin-shared/RULES.md
 #      (creating CLAUDE.md if there is none). Nothing else in CLAUDE.md is touched.
+#   3. Copies hooks/session-rename-reminder.sh into .claude/gwin-shared/hooks/ and adds one PostToolUse hook
+#      entry for it to .claude/settings.json (needs python). After `gh pr create` or `gh pr merge` the hook
+#      reminds Claude to rename the session. Other settings and hooks in the file are not touched.
 # If the folder is not a git repo, or the repo has no GitHub remote, it warns that the rules will work
 # only on this computer: Claude cloud sessions read the project from GitHub.
 # It only previews by default; pass --apply to write. It never commits or pushes.
@@ -32,7 +35,7 @@ while [ $# -gt 0 ]; do
     --uninstall) UNINSTALL=1; shift ;;
     --check) CHECK=1; shift ;;
     --staging) STAGING=$2; shift 2 ;;
-    -h|--help) sed -n '2,19p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,22p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
@@ -116,6 +119,13 @@ if [ "$CHECK" = 1 ]; then
   if [ -f "$CM" ] && grep -Fq "$START_MARK" "$CM" && grep -Fq "@$DEST_REL/RULES.md" "$CM"; then res PASS "rules: CLAUDE.md imports RULES.md"
   else res FIX "rules: CLAUDE.md imports RULES.md" "Run gwinrules --apply."; fi
   res INFO "rules: loaded in a session" "Start a new session and run /memory. All 12 rule files must show."
+
+  # Session-rename hook
+  HK="$CD/hooks/session-rename-reminder.sh"
+  if [ -f "$HK" ] && [ "$(tr -d '\r' < "$HK" | hash12)" = "$(tr -d '\r' < "$REPO/hooks/session-rename-reminder.sh" | hash12)" ]; then res PASS "hook: session-rename script is installed and matches Gwin_Shared"
+  else res FIX "hook: session-rename script is installed and matches Gwin_Shared" "Run gwinrules --apply."; fi
+  if [ -f "$ROOT/.claude/settings.json" ] && grep -Fq 'gwin-shared/hooks/session-rename-reminder' "$ROOT/.claude/settings.json"; then res PASS "hook: settings.json runs the session-rename hook"
+  else res FIX "hook: settings.json runs the session-rename hook" "Run gwinrules --apply. If you merged settings.json by hand, keep the gwin-shared hook entry."; fi
 
   # Staging and protection (rules 02, 07)
   if [ "$IS_GIT" = 1 ]; then
@@ -313,6 +323,62 @@ if [ "$ok" = 1 ]; then
   else action "$kind" "$CLAUDE_MD" "shared-rules import block" "$NEW"; fi
 fi
 
+# --- Session-rename hook -----------------------------------------------------------------------
+# Copies hooks/session-rename-reminder.sh into .claude/gwin-shared/hooks/ and wires it into
+# .claude/settings.json as a PostToolUse hook on Bash. After `gh pr create` or `gh pr merge` it reminds
+# Claude to rename the session. Only our own handler in settings.json is touched; python is needed to edit it.
+echo "Session-rename hook"
+HOOK_SRC="$REPO/hooks/session-rename-reminder.sh"
+HOOK_REL="$DEST_REL/hooks/session-rename-reminder.sh"
+HOOK_DST="$ROOT/$HOOK_REL"
+SETTINGS="$ROOT/.claude/settings.json"
+# The command strips CR first: a Windows clone with autocrlf=true checks the script out with CRLF, which breaks sh.
+# $CLAUDE_PROJECT_DIR must reach settings.json unexpanded, so it stays inside single quotes.
+sq="'"
+HOOK_CMD='sh -c "$(tr -d '$sq'\r'$sq' < "$CLAUDE_PROJECT_DIR/'$HOOK_REL'")"'
+PY=""
+for p in python3 python; do
+  if command -v "$p" >/dev/null 2>&1 && "$p" -c 'import json' >/dev/null 2>&1; then PY=$p; break; fi
+done
+is_managed_hook() { sed -n 2p "$1" | tr -d '\r' | grep -Fq 'Managed by gwinrules'; }
+
+if [ ! -f "$HOOK_SRC" ] || [ ! -f "$REPO/scripts/gwinrules-hook-settings.py" ]; then
+  warn "hook files are missing from Gwin_Shared (hooks/session-rename-reminder.sh); hook skipped"
+elif [ -z "$PY" ]; then
+  warn "python was not found, so .claude/settings.json cannot be edited; session-rename hook skipped. Install Python 3 and re-run."
+else
+  HOOK_OK=1
+  HOOK_STAGED="$TMP/hook.sh"
+  tr -d '\r' < "$HOOK_SRC" > "$HOOK_STAGED"
+  if [ "$UNINSTALL" = 1 ]; then
+    if [ -f "$HOOK_DST" ]; then
+      if is_managed_hook "$HOOK_DST" || [ "$FORCE" = 1 ]; then action remove "$HOOK_DST" "" ""
+      else warn "keep $HOOK_REL: not created by gwinrules (use --force to remove)"; fi
+    fi
+  elif [ ! -e "$HOOK_DST" ]; then action add "$HOOK_DST" "" "$HOOK_STAGED"
+  elif ! is_managed_hook "$HOOK_DST" && [ "$FORCE" = 0 ]; then
+    warn "skip $HOOK_REL: exists but wasn't created by gwinrules (use --force to replace)"; HOOK_OK=0
+  elif tr -d '\r' < "$HOOK_DST" | cmp -s "$HOOK_STAGED" -; then printf '  %-8s %s\n' same "$HOOK_REL"
+  else action update "$HOOK_DST" "" "$HOOK_STAGED"; fi
+
+  if [ "$HOOK_OK" = 1 ]; then
+    SET_NEW="$TMP/settings.new"
+    mode=install; [ "$UNINSTALL" = 1 ] && mode=uninstall
+    if res=$("$PY" "$REPO/scripts/gwinrules-hook-settings.py" "$SETTINGS" "$mode" "$HOOK_CMD" "$SET_NEW"); then
+      case "$res" in
+        create) action create "$SETTINGS" "hook entry" "$SET_NEW" ;;
+        update) if [ "$UNINSTALL" = 1 ]; then action update "$SETTINGS" "remove the hook entry" "$SET_NEW"
+                else action update "$SETTINGS" "add or refresh the hook entry" "$SET_NEW"; fi ;;
+        remove) action remove "$SETTINGS" "only held the hook entry" "" ;;
+        same)   printf '  %-8s %s\n' same ".claude/settings.json" ;;
+        *)      [ "$UNINSTALL" = 1 ] || printf '  %-8s %s\n' none ".claude/settings.json" ;;
+      esac
+    else
+      warn ".claude/settings.json is not valid JSON or has an unexpected shape; fix it by hand. It was left unchanged and the hook is not wired."
+    fi
+  fi
+fi
+
 # --- Apply -------------------------------------------------------------------------------------
 echo
 local_only_warning
@@ -322,9 +388,9 @@ if [ "$APPLY" = 0 ]; then echo "Preview only: $N change(s). Re-run with --apply 
 [ "$UNINSTALL" = 1 ] || mkdir -p "$DEST"
 tab=$(printf '\t')
 while IFS="$tab" read -r kind target staged; do
-  if [ "$kind" = remove ]; then rm -f "$target"; else cp "$staged" "$target"; fi
+  if [ "$kind" = remove ]; then rm -f "$target"; else mkdir -p "$(dirname "$target")"; cp "$staged" "$target"; fi
 done < "$ACTIONS"
-[ "$UNINSTALL" = 0 ] || rmdir "$DEST" 2>/dev/null || true
+[ "$UNINSTALL" = 0 ] || { rmdir "$DEST/hooks" 2>/dev/null || true; rmdir "$DEST" 2>/dev/null || true; }
 echo "Wrote $N change(s). Nothing was committed."
 if [ "$IS_GIT" = 1 ]; then
   echo "Review with: git -C \"$ROOT\" status"

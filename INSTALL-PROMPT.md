@@ -61,7 +61,9 @@ Wait for my answer. Ask again only if an answer contradicts another.
 **5. Install the shared rules.** Run `gwinrules` again with `-Apply` (PowerShell) or `--apply` (shell).
 
 **6. Install the pipeline.** Follow steps 5 to 8 of `pipeline-kit/INSTALL-PROMPT.md` exactly. The shared-rules
-block that step 5 added to `CLAUDE.md` stays where it is. Append the pipeline block after the gwin-shared:end marker.
+block that step 5 added to `CLAUDE.md` stays where it is. Append the pipeline block after the gwin-shared:end marker. When you merge the kit's `.claude/settings.json`
+into the project's file, keep the `gwin-shared/hooks/session-rename-reminder` entry in `hooks.PostToolUse`.
+If it is lost, run `gwinrules --apply` again.
 
 **6b. Make every rule able to fire.** The shared rules are instructions. A rule fires only when Claude loads
 it and the files, branches and tools it names exist. First run `gwinrules --check` (`-Check` in PowerShell)
