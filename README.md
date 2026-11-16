@@ -29,7 +29,7 @@ To set up someone else's project (shared rules and the agent pipeline in one pas
 [`INSTALL-PROMPT.md`](INSTALL-PROMPT.md). They paste the part between its two lines into Claude Code in their
 project. In a cloud session, check that `git clone` of Gwin_Shared and the kit works before step 3. If it
 fails, stop and show the error. This repo and the pipeline kit it installs,
-[gwin-claude-agent-pipeline-kit](https://github.com/gwincode/gwin-claude-agent-pipeline-kit), are both public.
+[gwin-claude-agent-pipeline-kit](https://github.com/mylifehealthorg/gwin-claude-agent-pipeline-kit), are both public.
 
 ## Which path to use
 
@@ -71,7 +71,7 @@ not PASS. `--staging NAME` sets the staging branch name.
 
 Edit rules here, never in a project's copy. A project overrides a shared rule only by saying so explicitly in
 its own `CLAUDE.md`. Pipeline agents (`po`, `code`, `qa`, `reviewer`) come from
-[gwin-claude-agent-pipeline-kit](https://github.com/gwincode/gwin-claude-agent-pipeline-kit), installed and
+[gwin-claude-agent-pipeline-kit](https://github.com/mylifehealthorg/gwin-claude-agent-pipeline-kit), installed and
 committed per project.
 
 ## Personal extras on this machine: `install`

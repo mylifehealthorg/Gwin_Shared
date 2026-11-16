@@ -33,10 +33,10 @@ the answers for step 7.
 
 **2. Get the sources.** Use the folder that contains this repo as the parent (for example `C:\code` or
 `~/code`).
-- `Gwin_Shared`: if `<parent>/Gwin_Shared` exists and is a clone of `gwincode/Gwin_Shared`, run `git pull`
-  there. If not, clone `https://github.com/gwincode/Gwin_Shared.git` to `<parent>/Gwin_Shared`. If the clone
+- `Gwin_Shared`: if `<parent>/Gwin_Shared` exists and is a clone of `mylifehealthorg/Gwin_Shared`, run `git pull`
+  there. If not, clone `https://github.com/mylifehealthorg/Gwin_Shared.git` to `<parent>/Gwin_Shared`. If the clone
   fails, stop and tell me the error.
-- The kit: clone `https://github.com/gwincode/gwin-claude-agent-pipeline-kit.git` to a temporary folder
+- The kit: clone `https://github.com/mylifehealthorg/gwin-claude-agent-pipeline-kit.git` to a temporary folder
   outside this repo. If the clone fails, stop and tell me the error. Copy its `pipeline-kit/` folder into this repo's root (the kit's install expects it
   there). Add the line `pipeline-kit/` to `.git/info/exclude`. That file is local and untracked. It stops
   the Stop hook from asking you to commit the copy. Do not commit `pipeline-kit/`.
@@ -125,7 +125,7 @@ settings in `~/.claude`. It does not change this repo.
 
 **7. Report and finish.**
 - Report in the shape of the kit's step 9, plus: the shared-rule files installed and their stamp
-  (`gwincode/Gwin_Shared@<commit>`).
+  (`mylifehealthorg/Gwin_Shared@<commit>`).
 - Report the token status line as one of: installed (with the backup file name); skipped (cloud session, or I
   said no); or failed (with the error). A missing Python 3 or installer counts as failed.
 - List every step 6b check as PASS, FIX applied, or BLOCKED, with what I must do next for each BLOCKED one.

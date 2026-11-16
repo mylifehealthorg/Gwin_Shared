@@ -15,7 +15,7 @@
 # Usage: scripts/test-sandbox-install.sh [--keep]   (--keep leaves the sandbox folder for inspection)
 set -eu
 
-KIT_URL=${KIT_URL:-https://github.com/gwincode/gwin-claude-agent-pipeline-kit.git}
+KIT_URL=${KIT_URL:-https://github.com/mylifehealthorg/gwin-claude-agent-pipeline-kit.git}
 ROOT=$(cd "$(dirname "$0")/.." && pwd -P)
 KEEP=0
 [ "${1:-}" = "--keep" ] && KEEP=1

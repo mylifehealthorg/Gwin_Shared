@@ -186,7 +186,7 @@ if [ "$CHECK" = 1 ]; then
 fi
 
 COMMIT=$(git -C "$REPO" rev-parse --short HEAD 2>/dev/null || echo unknown)
-SOURCE="gwincode/Gwin_Shared@$COMMIT"
+SOURCE="mylifehealthorg/Gwin_Shared@$COMMIT"
 if [ -n "$(git -C "$REPO" status --porcelain -- instructions 2>/dev/null)" ]; then
   SOURCE="$SOURCE+local"
   warn 'Gwin_Shared/instructions has uncommitted changes; copies will be stamped "+local".'

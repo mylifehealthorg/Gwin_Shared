@@ -271,7 +271,7 @@ if ($Check) {
 $commit = Invoke-Git $Repo @('rev-parse', '--short', 'HEAD')
 if (-not $commit) { $commit = 'unknown' }
 $dirty = Invoke-Git $Repo @('status', '--porcelain', '--', 'instructions')
-$source = "gwincode/Gwin_Shared@$commit"
+$source = "mylifehealthorg/Gwin_Shared@$commit"
 if ($dirty) {
     $source += '+local'
     Write-Warning 'Gwin_Shared/instructions has uncommitted changes; copies will be stamped "+local". Commit them in Gwin_Shared first for a clean stamp.'

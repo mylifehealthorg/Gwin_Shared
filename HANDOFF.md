@@ -7,7 +7,7 @@ Named `HANDOFF.md` to match what `gwinrules --check` looks for.
 ## Current state
 
 - **Branch:** `claude/dreamy-pascal-f8f6ss`, from `main` at `f527d68` (PR #8 merge).
-- **PR:** [gwincode/Gwin_Shared#9](https://github.com/gwincode/Gwin_Shared/pull/9), draft into `main` (this repo has no `staging`). The session is subscribed to its activity.
+- **PR:** [mylifehealthorg/Gwin_Shared#9](https://github.com/mylifehealthorg/Gwin_Shared/pull/9), draft into `main` (this repo has no `staging`). The session is subscribed to its activity.
 - **Next change:** owner rehearses the deck and says what to cut or change. The five live-demo slides need a real `/feature` run in a pipeline project.
 - **Session:** `v0.4.5 / PR #9 — The Harness deck (rules, pipeline, safe delivery)`
 - **Earlier PRs:** #4 to #8 are merged into `main`. Nothing from them is open.
