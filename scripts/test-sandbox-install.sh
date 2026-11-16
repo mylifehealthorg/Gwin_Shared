@@ -57,6 +57,9 @@ cp "$K"/commands/*.md "$SANDBOX/.claude/commands/"
 cp "$K/settings.json" "$SANDBOX/.claude/settings.json"
 cat "$K/CLAUDE-pipeline-block.md" >> "$SANDBOX/CLAUDE.md"
 cp "$K/handoff-template.md" "$SANDBOX/HANDOFF.md"
+# The kit's settings.json replaced the one gwinrules wrote. Re-run gwinrules, as the check tells the user
+# to, so the session-rename hook entry is merged back in.
+sh "$ROOT/scripts/gwinrules.sh" --project "$SANDBOX" --apply >/dev/null
 
 echo "== 5. Fill placeholders"
 cp "$K/tools/values.example.json" "$WORK/values.json"
@@ -99,7 +102,14 @@ check "--check passes the HANDOFF.md checks once the date is filled" grep -q 'PA
 check "--check passes once origin/staging exists" grep -q 'PASS     branches: staging exists' "$CHK2"
 check "--check flags the missing .env deny" grep -q 'FIX      secrets: settings.json denies reading .env' "$CHK"
 if [ "$PARITY" = run ]; then check "--check and -Check give the same results (sh vs PowerShell)" diff "$WORK/sh.lines" "$WORK/ps.lines"; fi
-check "rules copied (12 files + RULES.md)" test "$(ls .claude/gwin-shared | wc -l)" -eq 13
+check "rules copied (12 files + RULES.md)" test "$(find .claude/gwin-shared -maxdepth 1 -type f | wc -l)" -eq 13
+check "session-rename hook script installed" test -f .claude/gwin-shared/hooks/session-rename-reminder.sh
+check "settings.json has the session-rename hook" grep -q 'gwin-shared/hooks/session-rename-reminder' .claude/settings.json
+check "settings.json keeps the kit's settings next to the hook" python3 -c "import json; d=json.load(open('.claude/settings.json')); assert d.get('permissions'); assert any('session-rename' in h['command'] for g in d['hooks']['PostToolUse'] for h in g['hooks'])"
+check "rename hook speaks after gh pr create" sh -c "echo '{\"tool_input\":{\"command\":\"gh pr create\"}}' | sh .claude/gwin-shared/hooks/session-rename-reminder.sh | grep -q 'just opened'"
+check "rename hook speaks after gh pr merge" sh -c "echo '{\"tool_input\":{\"command\":\"gh pr merge 1\"}}' | sh .claude/gwin-shared/hooks/session-rename-reminder.sh | grep -q '(merged)'"
+check "rename hook is silent for other commands" sh -c "test -z \"\$(echo '{\"tool_input\":{\"command\":\"git status\"}}' | sh .claude/gwin-shared/hooks/session-rename-reminder.sh)\""
+check "--check passes the hook checks" grep -q 'PASS     hook: settings.json runs the session-rename hook' "$CHK2"
 check "RULES.md present" test -f .claude/gwin-shared/RULES.md
 check "CLAUDE.md imports RULES.md" grep -q '@.claude/gwin-shared/RULES.md' CLAUDE.md
 check "4 agents installed" test "$(ls .claude/agents/*.md | wc -l)" -eq 4
@@ -109,6 +119,11 @@ check "settings.json mentions the production branch 'main'" grep -q 'main' .clau
 check "no blanket allow in settings.json" sh -c "! python3 -c \"import json,sys; a=json.load(open('.claude/settings.json')).get('permissions',{}).get('allow',[]); sys.exit(0 if any(r in ('Bash(*)','PowerShell(*)') or r.endswith(':*)') for r in a) else 1)\""
 check "no placeholder left in .claude, CLAUDE.md, HANDOFF.md" sh -c "! grep -rn '{{' .claude CLAUDE.md HANDOFF.md | grep -v '\${{' | grep -q ."
 check "fill tool reports no placeholders left" sh -c "python3 pipeline-kit/tools/fill-placeholders.py $WORK/values.json .claude CLAUDE.md HANDOFF.md | grep -q 'No placeholders left'"
+
+echo "== 7. Uninstall removes only the hook and the rules"
+sh "$ROOT/scripts/gwinrules.sh" --project "$SANDBOX" --uninstall --apply >/dev/null
+check "uninstall removes the hook script and the folder" test ! -e .claude/gwin-shared
+check "uninstall keeps settings.json valid, with the kit's permissions" python3 -c "import json; d=json.load(open('.claude/settings.json')); assert d.get('permissions'); assert 'session-rename' not in json.dumps(d)"
 
 echo
 if [ "$fail" = 0 ]; then echo "All sandbox install checks passed."; else echo "Sandbox install checks FAILED."; fi

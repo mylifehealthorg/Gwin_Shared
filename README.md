@@ -60,6 +60,11 @@ Gwin_Shared commit and a content hash, and adds one marked block to the project'
 `.claude/gwin-shared/RULES.md`. It previews until you pass `-Apply`, never commits, and leaves hand-edited
 copies alone unless you pass `-Force`. Commit the result in the project. Re-run it after the rules change.
 
+It also installs the **session-rename hook** ([`hooks/session-rename-reminder.sh`](hooks/session-rename-reminder.sh)).
+It copies the script to `.claude/gwin-shared/hooks/` and adds one `PostToolUse` entry to the project's
+`.claude/settings.json`. After `gh pr create` or `gh pr merge`, the hook tells Claude to rename the session.
+It needs Python to edit `settings.json`, and it changes only its own entry. `--uninstall` removes it.
+
 If the folder is not a git repo, or the repo has no GitHub remote, it warns **LOCAL ONLY**: the rules then
 work only on this computer, because Claude cloud sessions and other computers get them from GitHub. It
 refuses to install into your home folder or a drive root.
