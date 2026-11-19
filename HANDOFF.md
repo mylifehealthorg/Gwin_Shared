@@ -6,7 +6,7 @@ Named `HANDOFF.md` to match what `gwinrules --check` looks for.
 
 ## Current state
 
-- **Branch:** `claude/dreamy-pascal-f8f6ss`, from `main` at `f527d68` (PR #8 merge).
+- **Branch:** `claude/peaceful-thompson-l74nj4` (this session). Earlier: `claude/dreamy-pascal-f8f6ss`, from `main` at `f527d68` (PR #8 merge).
 - **PR:** [mylifehealthorg/Gwin_Shared#9](https://github.com/mylifehealthorg/Gwin_Shared/pull/9), draft into `main` (this repo has no `staging`). The session is subscribed to its activity.
 - **Next change:** owner rehearses the deck and says what to cut or change. The five live-demo slides need a real `/feature` run in a pipeline project.
 - **Session:** `v0.4.5 / PR #9 — The Harness deck (rules, pipeline, safe delivery)`
@@ -80,3 +80,4 @@ Each was reproduced before fixing and re-tested after.
 - **Prompt 16:** Wrote a paste-ready prompt to install cachekeeper for every cloud session (upload to claude.ai account plugins, plus setup scripts on each cloud environment, pinned to reviewed commit `af2b6c5`). cachekeeper is not in the Anthropic plugin directory (searched). Nothing changed in this repo except this line.
 - **Prompt 17:** Write access came back. Pushed `claude/dreamy-pascal-f8f6ss` (5 commits plus this one). Draft PR creation failed twice with "invalid session" from the GitHub connector.
 - **Prompt 18:** Opened draft PR #9 on the third try (the connector had reconnected). Subscribed to PR activity.
+- **Prompt 17:** Compared obra/superpowers v7.0.2 (commit `22f0b46`, cloned read-only to the scratchpad) with `instructions/` and the pipeline kit. No conflict with the rule files themselves. Real conflicts: its SessionStart hook pushes a brainstorm → plan → subagent-build flow that bypasses `po`, GATE 1, `qa`, `reviewer` and the agent budget; `finishing-a-development-branch` offers a local merge; specs and plans go to `docs/superpowers/` next to `po`'s design doc. Recommendation: do not install the full plugin in pipeline projects without a `CLAUDE.md` override; or vendor only `systematic-debugging`, `test-driven-development`, `verification-before-completion` and `receiving-code-review`. Nothing installed or changed except this line.
